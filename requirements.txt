@@ -1,0 +1,58 @@
+# ClipFlow
+
+AI视频二创工具依赖
+
+## 核心依赖
+
+```
+PyQt6>=6.0.0
+yt-dlp>=2024.0.0
+ffmpeg-python>=0.2.0
+openai>=1.0.0
+edge-tts>=6.0.0
+pysrt>=1.1.2
+torch>=2.0.0
+```
+
+## 开发依赖
+
+```
+pytest>=7.0.0
+black>=23.0.0
+mypy>=1.0.0
+```
+
+## 可选依赖
+
+```
+whisperx>=3.0.0     # 语音识别
+faster-whisper>=0.9.0  # 更快的中文语音识别
+demucs>=4.0.0      # 人声分离
+```
+
+## 打包依赖
+
+```
+pyinstaller>=6.0.0
+```
+
+## 快速安装
+
+```bash
+pip install -r requirements.txt
+```
+
+## 完整安装（包括可选依赖）
+
+```bash
+pip install -r requirements.txt
+pip install whisperx
+```
+
+## PyTorch (CPU版本)
+
+如果不需要GPU加速：
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+```
