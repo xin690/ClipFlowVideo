@@ -3,7 +3,7 @@
 ## 项目信息
 - **项目名称**: ClipFlow (AI视频二创工具)
 - **开始日期**: 2026-05-20
-- **当前版本**: v1.0.0
+- **当前版本**: v1.0.2
 - **状态**: ✅ 功能完善中
 
 ---
@@ -21,7 +21,7 @@
 | AI 配音 | edge-tts | ✅ 完成 | 晓晓女声 |
 | 音频替换 | ffmpeg -map | ✅ 完成 | 移除原音，替换新音 |
 | 字幕生成 | SRT/ASS | ✅ 完成 | 保存到文件 |
-| 字幕烧录 | ffmpeg subtitles | ❌ 暂跳过 | ffmpeg 兼容性问题 |
+| 字幕烧录 | ffmpeg libass | ✅ 完成 | 中英双字幕 ASS，相对路径+original_size |
 | 日志系统 | logging | ✅ 完成 | 文件+控制台双输出 |
 
 ### UI 功能
@@ -65,7 +65,7 @@
 | settings_dialog.py | 设置对话框 | ✅ 完成 |
 | widgets.py | 自定义组件 | ✅ 完成 |
 | logger.py | 日志模块 | ✅ 完成 |
-| subtitle_saver.py | 字幕保存 | ✅ 完成 |
+| subtitle_saver.py | 字幕保存 | ✅ 完成 | 新增 save_bilingual_ass 双字幕 |
 
 ### 阶段4: 打包配置 ✅
 | 文件 | 说明 | 状态 |
@@ -148,11 +148,11 @@ ClipFlow/
 
 | 文件 | 路径 | 大小 | 说明 |
 |------|------|------|------|
-| ClipFlow.exe | dist/ClipFlow.exe | ~240 MB | 主程序 |
+| ClipFlow.exe | dist/ClipFlow.exe | ~548 MB | 主程序 |
 | ffmpeg.exe | dist/ffmpeg/ | ~193 MB | 视频处理 |
 | ffplay.exe | dist/ffmpeg/ | ~195 MB | 视频播放 |
 | ffprobe.exe | dist/ffmpeg/ | ~193 MB | 视频分析 |
-| **总计** | | **~821 MB** | |
+| **总计** | | **~1.13 GB** | |
 
 ---
 
@@ -184,6 +184,11 @@ ClipFlow/
 | 2026-05-20 | v1.0.1 | 优化 AI 改写提示词 |
 | 2026-05-20 | v1.0.1 | 添加音频替换功能（-map 命令） |
 | 2026-05-20 | v1.0.1 | 更新打包脚本和文档 |
+| 2026-06-01 | v1.0.2 | 中英双字幕（ASS双Style + 相对路径修复ffmpeg冒号解析） |
+| 2026-06-01 | v1.0.2 | 新增 save_bilingual_ass 方法 |
+| 2026-06-01 | v1.0.2 | 新增 rewritten_zh.srt/txt 单独保存 |
+| 2026-06-01 | v1.0.2 | 修复 ffprobe 分辨率检测 PATH 回退 |
+| 2026-06-01 | v1.0.2 | 重新打包，exe ~548MB + ffmpeg ~581MB |
 
 ---
 
@@ -197,15 +202,22 @@ ffmpeg -i video.webm -i tts.mp3 \
   -shortest -y output.mp4
 ```
 
-### 字幕烧录（暂跳过）
+### 字幕烧录（中英双字幕）
 ```bash
-ffmpeg -i video.webm -i tts.mp3 \
+# 1. 将字幕拷贝到输出目录 → 用相对路径避免冒号解析
+cp bilingual.ass /output/dir/
+
+# 2. 在输出目录执行 ffmpeg
+cd /output/dir
+ffmpeg -i input.mp4 -i tts.mp3 \
   -map 0:v -map 1:a \
-  -vf subtitles="sub.srt" \
-  -c:v libx264 -c:a aac \
+  -vf subtitles=bilingual.ass:original_size=1920x1080 \
+  -c:v libx264 -preset fast -crf 23 \
+  -c:a aac -b:a 192k \
   -shortest -y output.mp4
 ```
-> 注：ffmpeg subtitles 滤镜在某些版本有兼容性问题，当前使用回退方案
+> 注：ffmpeg 将 Windows 路径 `C:\...` 中的冒号解析为选项分隔符，导致 original_size 解析失败。
+> 解决方案：将字幕文件拷贝到输出目录，使用相对路径引用，并设置 `cwd=video_dir`。
 
 ### 日志文件位置
 ```
@@ -217,11 +229,10 @@ clipflow_YYYYMMDD_HHMMSS.log
 
 ## 待优化项
 
-1. **字幕烧录** - 解决 ffmpeg subtitles 兼容性问题
-2. **体积优化** - 排除不必要的 torch 模块
-3. **图标** - 添加自定义应用图标
-4. **安装包** - 使用 Inno Setup 制作专业安装程序
-5. **软字幕** - 添加可选的软字幕输出
+1. **体积优化** - 排除不必要的 torch 模块（当前 548MB）
+2. **图标** - 添加自定义应用图标
+3. **安装包** - 使用 Inno Setup 制作专业安装程序
+4. **软字幕** - 添加可选的软字幕输出
 
 ---
 
@@ -229,7 +240,7 @@ clipflow_YYYYMMDD_HHMMSS.log
 
 | 问题 | 状态 | 解决方案 |
 |------|------|------|
-| ffmpeg subtitles 兼容性 | ❌ 已知 | 当前跳过烧录，仅替换音频 |
+| ffmpeg `C:\` 冒号解析 | ✅ 已修复 | 相对路径 + original_size + cwd |
 | whisperx 未安装 | ⚠️ 运行时下载 | 使用 faster-whisper 替代 |
 | 包体积较大 | ⚠️ 包含 torch | 可选优化 |
 
@@ -244,19 +255,34 @@ clipflow_YYYYMMDD_HHMMSS.log
 4. 点击开始处理
 5. 等待处理完成
 6. 查看输出目录获取结果
-   ├── *.mp4          # 最终视频
-   ├── *.wav          # 提取的音频
-   ├── tts_output.mp3 # AI 配音
-   ├── subtitles.srt  # SRT 字幕
-   ├── subtitles.ass  # ASS 字幕
-   └── subtitles.txt  # 纯文本
+   ├── *_merged.mp4       # 最终视频（中英双字幕+AI配音）
+   ├── *.wav             # 提取的音频
+   ├── tts_output.mp3    # AI 配音
+   ├── bilingual.ass     # 中英双字幕ASS（烧录用）
+   ├── rewritten_zh.srt  # 改写后中文SRT
+   ├── rewritten_zh.txt  # 改写后中文纯文本
+   ├── subtitles.srt     # 原始识别SRT
+   ├── subtitles.ass     # 原始识别ASS
+   └── subtitles.txt     # 原始识别纯文本
+```
+
+---
+
+### 中英双字幕 ASS 格式
+```ass
+[V4+ Styles]
+Style: EnSub,Arial,24,&H99FFFFFF,...,Alignment=2,MarginV=95,1
+Style: ZhSub,Arial,36,&H00FFFFFF,...,Alignment=2,MarginV=30,1
+
+[Events]
+Dialogue: 0,...,EnSub,,0,0,0,,English text     ← 24px 半透白, 距底95px
+Dialogue: 0,...,ZhSub,,0,0,0,,中文文本           ← 36px 纯白, 距底30px
 ```
 
 ---
 
 ## 下一步计划
 
-1. 解决字幕烧录问题（尝试其他方法）
-2. 添加软字幕选项
-3. 测试更多视频源
-4. 优化处理速度
+1. 添加软字幕选项
+2. 测试更多视频源
+3. 优化处理速度

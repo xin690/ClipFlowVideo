@@ -188,9 +188,11 @@ class WorkerThread(QThread):
                 else:
                     self._emit_log("提示: 未识别到字幕，将保留原视频音频")
             
-            # AI改写
+            # AI改写（保存原文用于双字幕）
+            en_subtitles = None
             if need_full_processing and subtitles:
                 self.progress_update.emit("正在进行AI改写...", 60)
+                en_subtitles = [dict(s) for s in subtitles]
                 subtitles = self._rewrite_with_llm(subtitles)
             
             # 生成配音
@@ -212,22 +214,24 @@ class WorkerThread(QThread):
                 tts_path = audio_path
                 self._emit_log("使用原视频音频")
             
-            # 生成字幕文件用于烧录
+            # 生成中英双字幕用于烧录
             subtitle_burn_path = None
-            if need_full_processing and subtitles:
+            if need_full_processing and subtitles and en_subtitles:
                 try:
                     from src.ui.subtitle_saver import SubtitleSaver
                     saver = SubtitleSaver(video_dir)
-                    results = saver.save_all_formats(subtitles, "burn_subtitles")
-                    # 优先使用SRT格式（subtitles滤镜兼容性更好）
-                    subtitle_burn_path = results.get('srt') or results.get('ass')
-                    if subtitle_burn_path and os.path.exists(subtitle_burn_path):
-                        self._emit_log(f"字幕文件已准备: {subtitle_burn_path}")
+                    # 保存改写后的中文单独SRT/TXT
+                    saver.save_srt(subtitles, os.path.join(video_dir, "rewritten_zh.srt"))
+                    saver.save_txt(subtitles, os.path.join(video_dir, "rewritten_zh.txt"))
+                    # 生成中英双字幕ASS
+                    bilingual_ass = saver.save_bilingual_ass(en_subtitles, subtitles)
+                    if os.path.exists(bilingual_ass):
+                        subtitle_burn_path = bilingual_ass
+                        self._emit_log(f"中英双字幕已生成: {bilingual_ass}")
                     else:
-                        self._emit_log("字幕文件不存在，跳过烧录")
-                        subtitle_burn_path = None
+                        self._emit_log("双字幕文件生成失败，跳过烧录")
                 except Exception as e:
-                    self._emit_log(f"字幕准备失败: {e}")
+                    self._emit_log(f"双字幕生成失败: {e}")
                     import traceback
                     traceback.print_exc()
             
@@ -346,6 +350,30 @@ class WorkerThread(QThread):
             traceback.print_exc()
             return None
 
+    def _get_video_resolution(self, video_path):
+        """用ffprobe获取视频分辨率"""
+        ffmpeg_path = get_ffmpeg_path()
+        ffprobe_path = ffmpeg_path.replace('ffmpeg.exe', 'ffprobe.exe')
+        if not os.path.exists(ffprobe_path):
+            for alt in ['ffprobe.exe', 'ffprobe',
+                        os.path.join(os.path.dirname(ffmpeg_path), 'ffprobe.exe')]:
+                if os.path.exists(alt):
+                    ffprobe_path = alt
+                    break
+            else:
+                ffprobe_path = 'ffprobe'
+        try:
+            cmd = [ffprobe_path, '-v', 'error', '-select_streams', 'v:0',
+                   '-show_entries', 'stream=width,height', '-of', 'csv=p=0', video_path]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            out = result.stdout.strip()
+            if not out or ',' not in out:
+                return 1920, 1080
+            w, h = out.split(',')
+            return int(w), int(h)
+        except Exception:
+            return 1920, 1080
+
     def _merge_video_to_dir(self, video_path, audio_path, video_dir, video_id, subtitle_path=None):
         """合并视频到指定目录，支持字幕烧录"""
         if not audio_path:
@@ -361,38 +389,43 @@ class WorkerThread(QThread):
             if subtitle_path:
                 self._emit_log(f"  字幕: {subtitle_path} ({os.path.exists(subtitle_path)})")
             
-            # Windows 路径处理
-            subtitle_path_ffmpeg = subtitle_path.replace('\\', '/') if subtitle_path else None
-            
-            # 构建ffmpeg命令
-            # 策略：先移除原音频，再合并新音频和字幕
-            cmd = [
-                get_ffmpeg_path(), '-hide_banner', '-loglevel', 'error',
-                '-i', video_path, '-i', audio_path
-            ]
-            
             if subtitle_path and os.path.exists(subtitle_path):
-                self._emit_log(f"烧录字幕并替换音频: {subtitle_path}")
-                # 移除原视频音频，使用新音频，并烧录字幕
-                cmd.extend(['-map', '0:v'])  # 只取原视频的视频流（无音频）
-                cmd.extend(['-map', '1:a'])  # 取新音频
-                cmd.extend(['-vf', f'subtitles="{subtitle_path_ffmpeg}"'])
-                cmd.extend(['-c:v', 'libx264', '-preset', 'fast', '-crf', '23'])
-                cmd.extend(['-c:a', 'aac', '-b:a', '192k'])
+                self._emit_log(f"烧录中英双字幕并替换音频")
+                # 获取视频分辨率
+                width, height = self._get_video_resolution(video_path)
+                self._emit_log(f"  视频分辨率: {width}x{height}")
+                # 拷贝字幕到输出目录 → 用相对路径避免冒号解析问题
+                burn_name = "bilingual.ass"
+                burn_dest = os.path.join(video_dir, burn_name)
+                import shutil
+                shutil.copy2(subtitle_path, burn_dest)
+                self._emit_log(f"  字幕已拷贝: {burn_dest}")
+                cmd = [
+                    get_ffmpeg_path(), '-hide_banner', '-loglevel', 'error',
+                    '-i', video_path, '-i', audio_path,
+                    '-map', '0:v', '-map', '1:a',
+                    '-vf', f'subtitles={burn_name}:original_size={width}x{height}',
+                    '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+                    '-c:a', 'aac', '-b:a', '192k',
+                    '-shortest', '-y', merged_path
+                ]
             else:
                 self._emit_log("替换音频（无字幕）")
-                cmd.extend(['-map', '0:v'])  # 只取原视频的视频流
-                cmd.extend(['-map', '1:a'])  # 取新音频
-                cmd.extend(['-c:v', 'copy'])
-                cmd.extend(['-c:a', 'aac', '-b:a', '192k'])
-            
-            cmd.extend(['-shortest', '-y', merged_path])
+                cmd = [
+                    get_ffmpeg_path(), '-hide_banner', '-loglevel', 'error',
+                    '-i', video_path, '-i', audio_path,
+                    '-map', '0:v', '-map', '1:a',
+                    '-c:v', 'copy',
+                    '-c:a', 'aac', '-b:a', '192k',
+                    '-shortest', '-y', merged_path
+                ]
             
             self._emit_log(f"执行ffmpeg合并...")
-            self._emit_log(f"ffmpeg命令: {' '.join(cmd[:15])}...")
+            self._emit_log(f"ffmpeg命令: {' '.join(cmd[:12])}...")
             log_info(f"完整命令: {' '.join(cmd)}")
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+            cwd = video_dir if subtitle_path and os.path.exists(subtitle_path) else None
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, timeout=600)
             
             if result.returncode != 0:
                 error_msg = result.stderr

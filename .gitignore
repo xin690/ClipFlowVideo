@@ -71,3 +71,9 @@ wheels/
 .config/
 .settings.json
 api_keys.json
+
+# ffmpeg binaries (don't commit, download separately)
+ffmpeg/
+
+# Test output videos
+outVideo/

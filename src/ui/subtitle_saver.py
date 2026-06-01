@@ -106,6 +106,47 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         ms = int((seconds % 1) * 1000)
         return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
     
+    def save_bilingual_ass(self, en_subtitles: List[Dict], zh_subtitles: List[Dict],
+                           output_path: str = None) -> str:
+        """生成中英双字幕ASS文件（英文在上、中文在下）"""
+        if output_path is None:
+            output_path = os.path.join(self.output_dir, "bilingual.ass")
+
+        header = """[Script Info]
+Title: ClipFlow Bilingual Subtitles
+ScriptType: v4.00+
+Collisions: Normal
+PlayDepth: 0
+PlayResX: 1920
+PlayResY: 1080
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: EnSub,Arial,24,&H99FFFFFF,&H000088EF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,20,20,95,1
+Style: ZhSub,Arial,36,&H00FFFFFF,&H000088EF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,20,20,30,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+        events = []
+        min_len = min(len(en_subtitles), len(zh_subtitles))
+        for i in range(min_len):
+            en = en_subtitles[i]
+            zh = zh_subtitles[i]
+            start = self._format_ass_time(en['start'])
+            end = self._format_ass_time(en['end'])
+            en_text = self._escape_ass_text(en['text'])
+            zh_text = self._escape_ass_text(zh['text'])
+            events.append(f"Dialogue: 0,{start},{end},EnSub,,0,0,0,,{en_text}")
+            events.append(f"Dialogue: 0,{start},{end},ZhSub,,0,0,0,,{zh_text}")
+
+        content = header + '\n'.join(events)
+        os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        return output_path
+
     def _escape_ass_text(self, text: str) -> str:
         """转义ASS特殊字符"""
         text = text.replace('\\', '\\\\')

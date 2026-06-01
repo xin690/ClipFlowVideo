@@ -1,0 +1,61 @@
+{
+  "name": "clipflow",
+  "version": "1.0.0",
+  "description": "AI视频二创自动化工具",
+  "author": "",
+  "license": "MIT",
+  "requires_python": ">=3.10",
+  "dependencies": {
+    "gui": [
+      "PyQt6>=6.0.0"
+    ],
+    "core": [
+      "yt-dlp>=2024.0.0",
+      "ffmpeg-python>=0.2.0"
+    ],
+    "asr": [
+      "torch>=2.0.0"
+    ],
+    "llm": [
+      "openai>=1.0.0"
+    ],
+    "tts": [
+      "edge-tts>=6.0.0"
+    ],
+    "subtitle": [
+      "pysrt>=1.1.2"
+    ],
+    "packaging": [
+      "pyinstaller>=6.0.0"
+    ],
+    "optional": [
+      "whisperx>=3.0.0",
+      "faster-whisper>=0.9.0",
+      "demucs>=4.0.0"
+    ],
+    "dev": [
+      "pytest>=7.0.0",
+      "black>=23.0.0",
+      "mypy>=1.0.0"
+    ]
+  },
+  "install_requires": [
+    "PyQt6>=6.0.0",
+    "yt-dlp>=2024.0.0",
+    "ffmpeg-python>=0.2.0",
+    "torch>=2.0.0",
+    "openai>=1.0.0",
+    "edge-tts>=6.0.0",
+    "pysrt>=1.1.2"
+  ],
+  "extras_require": {
+    "asr": [
+      "whisperx>=3.0.0"
+    ],
+    "dev": [
+      "pytest>=7.0.0",
+      "black>=23.0.0",
+      "mypy>=1.0.0"
+    ]
+  }
+}

@@ -12,7 +12,7 @@
 | 自动中文配音 | ✅ | Edge-TTS (晓晓女声) |
 | 音频替换 | ✅ | 移除原音，替换为AI配音 |
 | 字幕生成 | ✅ | SRT/ASS/TXT 格式 |
-| 字幕烧录 | ⚠️ | 暂跳过（ffmpeg兼容性问题） |
+| 字幕烧录 | ✅ | 中英双字幕 ASS 烧录 |
 | 日志系统 | ✅ | 文件+控制台双输出 |
 
 ## 系统要求
@@ -53,13 +53,16 @@
 
 ```
 <视频ID>/
-├── *_merged.mp4      # 最终视频（已替换音频）
-├── *.webm           # 原始视频
-├── *.wav            # 提取的音频
-├── tts_output.mp3   # AI 配音文件
-├── subtitles.srt    # SRT 字幕
-├── subtitles.ass    # ASS 字幕
-└── subtitles.txt    # 纯文本字幕
+├── *_merged.mp4         # 最终视频（中英双字幕+AI配音）
+├── *.webm              # 原始视频
+├── *.wav               # 提取的音频
+├── tts_output.mp3      # AI 配音文件
+├── bilingual.ass       # 中英双字幕ASS（烧录用）
+├── rewritten_zh.srt    # 改写后中文SRT
+├── rewritten_zh.txt    # 改写后中文纯文本
+├── subtitles.srt       # 原始识别SRT
+├── subtitles.ass       # 原始识别ASS
+└── subtitles.txt       # 原始识别纯文本
 ```
 
 ## 配置说明
@@ -175,6 +178,13 @@ C:\Users\<用户名>\AppData\Local\Temp\ClipFlow\logs\
 ```
 
 ## 更新日志
+
+### v1.0.2 (2026-06-01)
+- 中英双字幕烧录（ASS双Style + 相对路径修复ffmpeg冒号解析）
+- 新增 save_bilingual_ass 方法生成双字幕ASS
+- 新增 rewritten_zh.srt/txt 单独保存
+- 修复 ffprobe 分辨率检测 PATH 回退
+- 重新打包 ~1.13GB
 
 ### v1.0.1 (2026-05-20)
 - 添加日志系统（文件+控制台双输出）
