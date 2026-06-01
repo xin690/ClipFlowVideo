@@ -397,9 +397,12 @@ class WorkerThread(QThread):
                 # 拷贝字幕到输出目录 → 用相对路径避免冒号解析问题
                 burn_name = "bilingual.ass"
                 burn_dest = os.path.join(video_dir, burn_name)
-                import shutil
-                shutil.copy2(subtitle_path, burn_dest)
-                self._emit_log(f"  字幕已拷贝: {burn_dest}")
+                if os.path.normpath(subtitle_path) != os.path.normpath(burn_dest):
+                    import shutil
+                    shutil.copy2(subtitle_path, burn_dest)
+                    self._emit_log(f"  字幕已拷贝: {burn_dest}")
+                else:
+                    self._emit_log(f"  字幕已在目标目录，跳过拷贝")
                 cmd = [
                     get_ffmpeg_path(), '-hide_banner', '-loglevel', 'error',
                     '-i', video_path, '-i', audio_path,
