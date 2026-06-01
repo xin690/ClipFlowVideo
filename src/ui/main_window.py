@@ -481,8 +481,8 @@ class WorkerThread(QThread):
                 video_id = info.get('id', 'unknown')
                 video_title = info.get('title', video_id)
             
-            # 创建以视频ID命名的文件夹
-            video_dir = os.path.join(self.output_dir, video_id)
+            # 创建以视频ID命名的文件夹（标准化路径分隔符）
+            video_dir = os.path.normpath(os.path.join(self.output_dir, video_id))
             os.makedirs(video_dir, exist_ok=True)
             self.log_message.emit(f"工作目录: {video_dir}")
             
